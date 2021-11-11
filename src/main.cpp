@@ -43,7 +43,13 @@ int gTopTempFset=140;
 int gBtmTempFset=140;
 int gFmtTempFset=140;
 
-int gExhActual=0;
+
+const int EXH_OFF=0;
+const int EXH_LOW=1;
+const int EXH_AUTO=2;
+const int EXH_HIGH=3;
+int gExhActual=EXH_OFF;
+
 int exhaustControlOutput=0;
 
 int topTimerEnable;
@@ -500,8 +506,8 @@ void setup() {
   pinMode(LIGHT_TOP_PWM,OUTPUT);
   pinMode(LIGHT_BTM_PWM,OUTPUT);
   pinMode(PA0, INPUT_ANALOG);
-  nexMain.begin(57600);
-  nexStatus.begin(57600);
+  nexMain.begin(115200);
+  nexStatus.begin(115200);
   Serial3.begin(9600);
   delay(100);
   setRelayModes();
@@ -685,7 +691,7 @@ void getnexMainVariables(){
   int oldTopTimerEnable=topTimerEnable;
   topTimerEnable = nexMain.readNumber("page0.topTimerEnable.val");
   if(topTimerEnable!=oldTopTimerEnable)topTimerReset();
-
+  
   int oldBtmTimerEnable=btmTimerEnable;
   btmTimerEnable = nexMain.readNumber("page0.btmTimerEnable.val");
   if(btmTimerEnable!=oldBtmTimerEnable)btmTimerReset();
@@ -751,9 +757,9 @@ void damperControl(){
       actualTopDamperPos=0;
     break;
     case 1://Damper LOW
-      if(gExhActual==0){
+      if(gExhActual==EXH_OFF){
         actualTopDamperPos=DAMPER_CLOSED;
-      }else if(gExhActual==1){//MAIN ON AUTO
+      }else if(gExhActual==EXH_AUTO){//MAIN ON AUTO
         topOverridesForLOW=1;//force exhaustControlOutput speed to 1 = LOW
         if(!topHeatEnable){
           actualTopDamperPos=DAMPER_HIGH; // NO HEAT, KEEP AS COOL AS POSSIBLE ON LOW FAN
@@ -769,9 +775,9 @@ void damperControl(){
       }      
     break;
     case 2://Damper HIGH
-      if(gExhActual==0){
+      if(gExhActual==EXH_OFF){
         actualTopDamperPos=DAMPER_CLOSED;
-      }else if(gExhActual==1){//MAIN ON AUTO
+      }else if(gExhActual==EXH_AUTO){//MAIN ON AUTO
         topOverridesForHIGH=1;//force exhaustControlOutput speed to 2 = HIGH
         actualTopDamperPos=DAMPER_HIGH;
       }else{//MAIN ON HIGH
@@ -785,10 +791,10 @@ void damperControl(){
       //damperServoBtmState=DAMPER_CLOSED; 
     break;
     case 1://Damper LOW
-      if(gExhActual==0){
+      if(gExhActual==EXH_OFF){
         //Serial3.println(0);
         //damperServoBtmState=DAMPER_CLOSED;
-      }else if(gExhActual==1){//MAIN ON AUTO
+      }else if(gExhActual==EXH_AUTO){//MAIN ON AUTO
         //btmOverridesForLOW=1;//force exhaustControlOutput speed to 1 = LOW
         //Serial3.println(30);
         //damperServoBtmState=DAMPER_CLOSED;
@@ -798,9 +804,9 @@ void damperControl(){
       }      
     break;
     case 2://Damper HIGH
-      if(gExhActual==0){
+      if(gExhActual==EXH_OFF){
         //Serial3.println(0);
-      }else if(gExhActual==1){//MAIN ON AUTO
+      }else if(gExhActual==EXH_AUTO){//MAIN ON AUTO
         //btmOverridesForHIGH=1;//force exhaustControlOutput speed to 2 = HIGH
         //Serial3.println(100);
         //damperServoBtmState=DAMPER_OPEN;
@@ -815,16 +821,19 @@ void damperControl(){
   
   if(topOverridesForLOW || btmOverridesForLOW)exhaustControlOutput=1;
   if(topOverridesForHIGH || btmOverridesForHIGH)exhaustControlOutput=2;
-  if(gExhActual==1 && gExhTopLoHiTarget==0 && gExhBtmLoHiTarget==0){
+  if(gExhActual==EXH_AUTO && gExhTopLoHiTarget==0 && gExhBtmLoHiTarget==0){
 
     exhaustControlOutput=0;
   }
   // switch case above, damper controls will turn exhaustControlOutput to 1 if either need it
   switch(gExhActual){
-    case 0: // OVERRIDE OFF
+    case EXH_OFF: // OVERRIDE OFF
       exhaustControlOutput=0;
     break;
-    case 2: // AUTO
+    case EXH_LOW: // OVERRIDE LOW
+      exhaustControlOutput=1;
+    break;
+    case EXH_HIGH: // OVERRIDE HIGH
       exhaustControlOutput=2;
     break;
   }
@@ -885,8 +894,8 @@ void circulatorCheck(){
   if(fmtInHeaterCooldownMode())fmtEnable=1;
 
   //recirculator overrides if calling for MAX venting ----------------------------
-  if(gExhTopLoHiTarget==2 && gExhActual>0)topEnable=1;
-  if(gExhBtmLoHiTarget==2 && gExhActual>0)btmEnable=1;
+  if(gExhTopLoHiTarget==2 && gExhActual>EXH_OFF)topEnable=1;
+  if(gExhBtmLoHiTarget==2 && gExhActual>EXH_OFF)btmEnable=1;
   
   // final heater overrides - if heaters are on, the recirculator fans need to be on
   if(topHeatEnable || gRecircTop)topEnable=1;
@@ -1105,6 +1114,7 @@ void serialEvent2() {
   }
   //Serial0.println(serial2EventString);
 }
+// ============= MAIN LOOP ==========================================================================
 void loop() {
   //currentmicros=micros();
   currentms=millis();
