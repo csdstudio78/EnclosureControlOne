@@ -1,0 +1,39 @@
+{
+	"folders": [
+		{
+			"name": "Enclosure",
+			"path": "..\\..\\Enclosure"
+		},
+		{
+			"name": "BluePill Enclosure",
+			"path": ".."
+		},
+		{
+			"name": "Arduino Nano Stepper Driver",
+			"path": "..\\..\\Arduino Nano Stepper Driver"
+		},
+		{
+			"name": "Teensy 3.5 Stuff 1",
+			"path": "Y:\\PlatformIO\\Teensy 3.5 Stuff 1"
+		},
+		{
+			"name": "Teensy First Test",
+			"path": "..\\..\\Teensy First Test"
+		},
+		{
+			"name": "Teensy 3.5 Test",
+			"path": "..\\..\\Teensy 3.5 Test"
+		},
+		{
+			"name": "BlueBill Testing v2",
+			"path": "..\\..\\BlueBill Testing v2"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"string": "cpp",
+			"string_view": "cpp"
+		}
+	}
+}
