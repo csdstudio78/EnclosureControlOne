@@ -1,9 +1,6 @@
 #include <Arduino.h>
-//#include <PString.h>
-//#include <DHT.h>
 #include "EasyNextionLibrary.h"  // Include EasyNextionLibrary
 #include <SimpleDHT.h>
-#include <Adafruit_DS3502.h>
 
 #define DHTPIN_TOP PB3    // what pin we're connected to
 #define DHTPIN_BTM PB12    // what pin we're connected to
@@ -16,7 +13,6 @@
 #define LIGHT_BTM_PWM PA1
 
 USBSerial Serial0=Serial;
-
 
 // MAIN ===========================================================
 long currentmicros=0;
