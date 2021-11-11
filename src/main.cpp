@@ -119,12 +119,6 @@ int gRecircTop;
 int gRecircBtm;
 int gRecircFmt;
 
-//const int initTime=4000;
-//bool hasInited;
-
-//int messageTimeout=2;
-//float lastMessagePush;
-
 const int damperServoBtmOpen=420;
 const int damperServoBtmClosed=695;
 const int DAMPER_CLOSED=0;
@@ -403,10 +397,12 @@ void heaterCheck(){
     }
     btmHeaterEnableDuration=currentsec-btmHeaterEnableStart;
     btmPercentHeatingEff=100-((btmHeaterActualOnTime/btmHeaterEnableDuration)*100);
-  }else if(heatWasOnBtm){
-    relayHeaterFanOffTimeBtm=currentsec;
-    heatWasOnBtm=false;
+  }else{
     shutdownBtmHeater();
+    if(heatWasOnBtm){
+      relayHeaterFanOffTimeBtm=currentsec;
+      heatWasOnBtm=false;
+    }
   }
 
   // ======= FILAMENT HEATER =================== //
@@ -454,10 +450,12 @@ void heaterCheck(){
     }
     fmtHeaterEnableDuration=currentsec-fmtHeaterEnableStart;
     fmtPercentHeatingEff=100-(fmtHeaterActualOnTime/fmtHeaterEnableDuration)*100;
-  }else if(heatWasOnFmt){
-    relayHeaterFanOffTimeFmt=currentsec;
-    heatWasOnFmt=false;
+  }else{
     shutdownFmtHeater();
+    if(heatWasOnFmt){
+      relayHeaterFanOffTimeFmt=currentsec;
+      heatWasOnFmt=false;
+    }
   }
 }
 /*void sendStringToNextion(HardwareSerial &p_device,String p_var, String p_data){
@@ -565,43 +563,20 @@ float float_one_point_round(float value)
 void sendAtmosDataToNexDisplay(){
   // TEMPS
   String temp=getCleanString(sensorDataTop.tempAvg);
-  //String tenths=temp.substring(3,5);
-  //temp.remove(3,2);
-
-  //sendStringToNextion(Serial1,"page0.gTopTempF.txt",temp);
-  //sendStringToNextion(Serial1,"page0.gTopTempF10.txt",tenths);
 
   nexStatus.writeStr("page0.gTopTempF.txt", temp);
-  //nexStatus.writeStr("page0.gTopTempF10.txt", tenths);
 
   temp=getCleanString(sensorDataBtm.tempAvg);
-  //tenths=temp.substring(3,5);
-  //temp.remove(3,2);
   nexStatus.writeStr("page0.gBtmTempF.txt", temp);
-  //nexStatus.writeStr("page0.gBtmTempF10.txt", tenths);
 
   temp=getCleanString(sensorDataFmt.tempAvg);
-  //tenths=temp.substring(3,5);
-  //temp.remove(3,2);
   nexStatus.writeStr("page0.gFmtTempF.txt", temp);
-  //nexStatus.writeStr("page0.gFmtTempF10.txt", tenths);
-
 
   temp=getCleanString(sensorDataOut.tempAvg);
-  //tenths=temp.substring(3,5);
-  //temp.remove(3,2);
-  //temp.remove(0,1);
   nexStatus.writeStr("page0.gOutTempF.txt", temp);
-  //nexStatus.writeStr("page0.gOutTempF10.txt", tenths);
  
-
   temp=getCleanString(sensorDataAmb.tempAvg);
-  //tenths=temp.substring(3,5);
-  //temp.remove(3,2);
-  //temp.remove(0,1);
   nexStatus.writeStr("page0.gAmbTempF.txt", temp);
-  //nexStatus.writeStr("page0.gAmbTempF10.txt", tenths);
-
 
   //HUMIDITY
   char humStr[5];
@@ -650,11 +625,7 @@ void sendAtmosDataToNexDisplay(){
 
   dtostrf(sensorDataFmt.humAvg, 4, 1, humStr);
   String newHum=humStr;
-  //tenths=newHum.substring(3,5);
-  //newHum.remove(0,1);
-  //newHum.remove(2,2);
   nexStatus.writeStr("page0.gRhActual.txt", newHum);
-  //nexStatus.writeStr("page0.gRhActual10.txt", tenths);
 }
 
 void sendDataNexMain(){
@@ -730,7 +701,6 @@ void getnexMainVariables(){
   topTimerSet=float(nexMain.readNumber("page0.topTimerSet.val"));
   btmTimerSet=float(nexMain.readNumber("page0.btmTimerSet.val"));
   fmtTimerSet=float(nexMain.readNumber("page0.fmtTimerSet.val"));
-  //Serial0.println("All Variables Grabbed fron NexMain");
 }
 // ==== MAIN STATUS LED BLINK
 
