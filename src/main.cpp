@@ -26,6 +26,8 @@ int systemStatusBool;
 int lastSystemIncStepTime;
 int systemIncStepInt=1000;
 bool runSystemIncCommands;
+int gEnterProgTop;
+int gEnterProgBtm;
 
 int topHeatEnable=0;
 int btmHeatEnable=0;
@@ -43,6 +45,11 @@ int gTopTempFset=140;
 int gBtmTempFset=140;
 int gFmtTempFset=140;
 
+// STRINGS ==============================================================
+const String TEXT_COOLING_FAN="FAN: ";
+const String TEXT_EFF="Eff: ";
+const String TEXT_RH_SMALL="R/H: ";
+const String TEXT_HEATING_RAMP="Heating";
 
 const int EXH_OFF=0;
 const int EXH_LOW=1;
@@ -129,9 +136,9 @@ const int DAMPER_MEDLOW=10;
 const int DAMPER_MED=50;
 const int DAMPER_HIGH=100;
 
-const int DAMPER_OPEN=0;
-int damperServoTopState=DAMPER_OPEN;
-int damperServoBtmState=DAMPER_OPEN;
+//check states for icons
+bool pTopHtFanIsShowing=1,pBtmHtFanIsShowing=1,pFmtHtFanIsShowing=1,pTopRecFanIsShowing=1,pBtmRecFanIsShowing=1,pFmtRecFanIsShowing=1;
+
 int gExhTopLoHiTarget;
 int gExhBtmLoHiTarget;
 int actualTopDamperPos=0;
@@ -204,7 +211,6 @@ EasyNex nexStatus(Serial1);
 String getCleanString(double p_tempF){
   if(p_tempF>999 || p_tempF<-99)return "ERR";
   char temperatureFTemp[5];
-  //PString(temperatureFTemp, sizeof(temperatureFTemp), p_tempF);
   dtostrf(p_tempF, 5, 1, temperatureFTemp);
   return temperatureFTemp;
 }
@@ -472,7 +478,6 @@ void heaterCheck(){
   p_device.write(0xff); //it will tell the Nextion that this is the end of what we want to send.
   p_device.write(0xff);
 }*/
-
 void setRelayModes(){
   for (int i = 0; i < RELAY_COUNT; i++) {
     if(allRelays[i])pinMode(allRelays[i], OUTPUT);
@@ -506,8 +511,9 @@ void setup() {
   pinMode(LIGHT_TOP_PWM,OUTPUT);
   pinMode(LIGHT_BTM_PWM,OUTPUT);
   pinMode(PA0, INPUT_ANALOG);
-  nexMain.begin(115200);
-  nexStatus.begin(115200);
+  Serial0.begin(57600);
+  nexMain.begin(57600);
+  nexStatus.begin(57600);
   Serial3.begin(9600);
   delay(100);
   setRelayModes();
@@ -582,52 +588,52 @@ void sendAtmosDataToNexDisplay(){
 
   //HUMIDITY
   char humStr[5];
+
+  dtostrf(sensorDataFmt.humAvg, 4, 1, humStr);
+  String newHum=humStr;
+  nexStatus.writeStr("page0.gRhActual.txt", newHum);
+  
   if(!topHeatEnable){
     dtostrf(sensorDataTop.humAvg, 5, 1, humStr);
-    nexStatus.writeStr("page0.gTopRH.txt", "R/H:"+String(humStr)+"%");
+    nexStatus.writeStr("page0.gTopRH.txt", TEXT_RH_SMALL+String(humStr)+"%");
   }else{
     if(topHeatIsInitialHeatRamp){
-      nexStatus.writeStr("page0.gTopRH.txt", "Heating");
+      nexStatus.writeStr("page0.gTopRH.txt", TEXT_HEATING_RAMP);
     }else{
       String textVal= String(float_one_point_round(topPercentHeatingEff));
       textVal.remove(textVal.length()-1,1);
-      nexStatus.writeStr("page0.gTopRH.txt", "Eff:"+textVal+"%");
+      nexStatus.writeStr("page0.gTopRH.txt", TEXT_EFF+textVal+"%");
     }
   }
 
   if(!btmHeatEnable){
     dtostrf(sensorDataBtm.humAvg, 5, 1, humStr);
-    nexStatus.writeStr("page0.gBtmRH.txt", "R/H:"+String(humStr)+"%");
+    nexStatus.writeStr("page0.gBtmRH.txt", TEXT_RH_SMALL+String(humStr)+"%");
   }else{
     if(btmHeatIsInitialHeatRamp){
-      nexStatus.writeStr("page0.gBtmRH.txt", "Heating");
+      nexStatus.writeStr("page0.gBtmRH.txt", TEXT_HEATING_RAMP);
     }else{
       String textVal= String(float_one_point_round(btmPercentHeatingEff));
       textVal.remove(textVal.length()-1,1);
-      nexStatus.writeStr("page0.gBtmRH.txt", "Eff:"+textVal+"%");
+      nexStatus.writeStr("page0.gBtmRH.txt", TEXT_EFF+textVal+"%");
     }
   }
 
   if(!fmtHeatEnable){
     dtostrf(sensorDataOut.humAvg, 5, 1, humStr);
-    nexStatus.writeStr("page0.gOutRH.txt", "R/H:"+String(humStr)+"%");
+    nexStatus.writeStr("page0.gOutRH.txt", TEXT_RH_SMALL+String(humStr)+"%");
   }else{
     if(fmtHeatIsInitialHeatRamp){
-      nexStatus.writeStr("page0.gOutRH.txt", "Heating");
+      nexStatus.writeStr("page0.gOutRH.txt", TEXT_HEATING_RAMP);
     }else{
       String textVal= String(float_one_point_round(fmtPercentHeatingEff));
       textVal.remove(textVal.length()-1,1);
-      nexStatus.writeStr("page0.gOutRH.txt", "Eff:"+textVal+"%");
+      nexStatus.writeStr("page0.gOutRH.txt", TEXT_EFF+textVal+"%");
     }
   }
   
-
   dtostrf(sensorDataAmb.humAvg, 5, 1, humStr);
-  nexStatus.writeStr("page0.gAmbRH.txt", "R/H:"+String(humStr)+"%");
-
-  dtostrf(sensorDataFmt.humAvg, 4, 1, humStr);
-  String newHum=humStr;
-  nexStatus.writeStr("page0.gRhActual.txt", newHum);
+  nexStatus.writeStr("page0.gAmbRH.txt", TEXT_RH_SMALL+String(humStr)+"%");
 }
 
 void sendDataNexMain(){
@@ -641,19 +647,17 @@ void sendDataNexStatus(){
   nexStatus.writeNum("page0.gTopHtActual.val", topHeatActual); // feedback to show if heater actually is on
   nexStatus.writeNum("page0.gBtmHtActual.val", btmHeatActual); // feedback to show if heater actually is on
   nexStatus.writeNum("page0.gFmtHtActual.val", fmtHeatActual); // feedback to show if heater actually is on
-  nexStatus.writeNum("page0.gExhActual.val", exhaustControlOutput); // actual exhaust speed being called for
-  if(sensorDataFmt.hum>=30.0){
-    nexStatus.writeNum("page0.gRHwarning.val", 1);
-  }else{
-    nexStatus.writeNum("page0.gRHwarning.val", 0);
-  }
-  nexStatus.writeStr("page0.gTopTempFset.txt", getCleanStringInt(gTopTempFset)); //
-  nexStatus.writeStr("page0.gBtmTempFset.txt", getCleanStringInt(gBtmTempFset)); //
-  nexStatus.writeStr("page0.gFmtTempFset.txt", getCleanStringInt(gFmtTempFset)); //
+  nexStatus.writeNum("page0.gExhActual.val", exhaustControlOutput); // actual exhaust speed being applied
+  nexStatus.writeNum("page0.gRHwarning.val", sensorDataFmt.hum>=30.0 ? 1 : 0);
+  nexStatus.writeStr("page0.gTopTempFset.txt", topHeatEnable ? String(gTopTempFset) : "OFF"); //
+  nexStatus.writeStr("page0.gBtmTempFset.txt", btmHeatEnable ? String(gBtmTempFset) : "OFF"); //
+  nexStatus.writeStr("page0.gFmtTempFset.txt", fmtHeatEnable ? String(gFmtTempFset) : "OFF"); //
+
   nexStatus.writeStr("page0.tDmpTop.txt", String(actualTopDamperPos)+"%");
 
-  nexStatus.writeStr("page0.tDmpBtm.txt", "100%"); 
-  nexStatus.writeStr("page0.tDmpAmb.txt", "--"); 
+  nexStatus.writeStr("page0.tDmpBtm.txt", "50%"); // currently innactive
+  nexStatus.writeStr("page0.tDmpAmb.txt", "N/A"); // currently innactive
+  nexStatus.writeStr("page0.tDmpFum.txt", "N/A"); // currently innactive
 }
 // =======================================================================================
 void topTimerReset(){
@@ -678,7 +682,7 @@ void getnexMainVariables(){
   gTopTempFset = nexMain.readNumber("page0.gTopTempFset.val");   // Pull the top heater temp set
   gBtmTempFset = nexMain.readNumber("page0.gBtmTempFset.val");   // Pull the btm heater temp set
   gFmtTempFset = nexMain.readNumber("page0.gFmtTempFset.val");   // Pull the btm heater temp set
-  gExhActual = nexMain.readNumber("page0.gExhActual.val");   // Pull the exhaust fan val 0-2
+  gExhActual = nexMain.readNumber("page0.gExhActual.val");   // Pull the exhaust fan val 0-3 (Off, Low, Auto, High)
   gLightsTop = nexMain.readNumber("page0.gLightsTop.val");   // Pull the lights val 0-3
   gLightsBtm = nexMain.readNumber("page0.gLightsBtm.val");   // Pull the lights val 0-3
   gExhTopLoHiTarget=nexMain.readNumber("page0.gExhTopLoHi.val");   // Pull the btm exh target 0/1
@@ -716,7 +720,7 @@ void systemStatus(){
     //digitalWrite(led, LOW);
     //allRelaysON();
   }
-  Serial0.println("Status: OK Serial");
+  Serial0.println("Status: Normal");
   //Serial0.println(uptimeString);
   //Serial1.println("Status: OK Serial1");
   //Serial2.println("Status: OK Serial2");
@@ -759,6 +763,8 @@ void damperControl(){
     case 1://Damper LOW
       if(gExhActual==EXH_OFF){
         actualTopDamperPos=DAMPER_CLOSED;
+      }else if(gExhActual==EXH_LOW){//MAIN ON LOW
+        actualTopDamperPos=topHeatEnable?DAMPER_LOW:DAMPER_HIGH;
       }else if(gExhActual==EXH_AUTO){//MAIN ON AUTO
         topOverridesForLOW=1;//force exhaustControlOutput speed to 1 = LOW
         if(!topHeatEnable){
@@ -818,14 +824,14 @@ void damperControl(){
   }
 
   Serial3.println(actualTopDamperPos);
-  
+  // in switch case above, damper controls will enable exhaustControlOutput to 1 if either need it
   if(topOverridesForLOW || btmOverridesForLOW)exhaustControlOutput=1;
   if(topOverridesForHIGH || btmOverridesForHIGH)exhaustControlOutput=2;
   if(gExhActual==EXH_AUTO && gExhTopLoHiTarget==0 && gExhBtmLoHiTarget==0){
 
     exhaustControlOutput=0;
   }
-  // switch case above, damper controls will turn exhaustControlOutput to 1 if either need it
+  
   switch(gExhActual){
     case EXH_OFF: // OVERRIDE OFF
       exhaustControlOutput=0;
@@ -857,13 +863,17 @@ void damperControl(){
       break;
   }
 }
-void showNexElement(String p_element){
+void showNexElement(String p_element, bool &p_statusVar){
+  if(p_statusVar)return;
+  p_statusVar=true;
   Serial1.print("vis "+p_element+",1");
   Serial1.write(0xff);
   Serial1.write(0xff);
   Serial1.write(0xff);
 }
-void hideNexElement(String p_element){
+void hideNexElement(String p_element, bool &p_statusVar){
+  if(!p_statusVar)return;
+  p_statusVar=false;
   Serial1.print("vis "+p_element+",0");
   Serial1.write(0xff);
   Serial1.write(0xff);
@@ -882,7 +892,6 @@ bool fmtInHeaterCooldownMode(){
   if(!fmtHeatEnable && !gRecircFmt && (currentsec-relayHeaterFanOffTimeFmt<=RELAY_HTR_FAN_OFF_LIMIT))return true;
   return false;
 }
-
 void circulatorCheck(){
   int topEnable=0;
   int btmEnable=0;
@@ -902,35 +911,39 @@ void circulatorCheck(){
   if(btmHeatEnable || gRecircBtm)btmEnable=1;
   if(fmtHeatEnable || gRecircFmt)fmtEnable=1;
 
+  //int tempDeltaforRecircFan=1;
+  //if(topHeatEnable && gTopTempFset-sensorDataTop.temp>tempDeltaforRecircFan)topEnable=1;
+  //if(btmHeatEnable && gBtmTempFset-sensorDataBtm.temp>tempDeltaforRecircFan)btmEnable=1;
+
   if(topHeatEnable){
-    showNexElement("pTopHtFan");
+    showNexElement("pTopHtFan",pTopHtFanIsShowing);
   }else{
-    hideNexElement("pTopHtFan");
+    hideNexElement("pTopHtFan",pTopHtFanIsShowing);
   }
   if(btmHeatEnable){
-    showNexElement("pBtmHtFan");
+    showNexElement("pBtmHtFan",pBtmHtFanIsShowing);
   }else{
-    hideNexElement("pBtmHtFan");
+    hideNexElement("pBtmHtFan",pBtmHtFanIsShowing);
   }
   if(fmtHeatEnable){
-    showNexElement("pFmtHtFan");
+    showNexElement("pFmtHtFan",pFmtHtFanIsShowing);
   }else{
-    hideNexElement("pFmtHtFan");
+    hideNexElement("pFmtHtFan",pFmtHtFanIsShowing);
   }
   if(gRecircTop){
-    showNexElement("pTopRecFan");
+    showNexElement("pTopRecFan",pTopRecFanIsShowing);
   }else{
-    hideNexElement("pTopRecFan");
+    hideNexElement("pTopRecFan",pTopRecFanIsShowing);
   }
   if(gRecircBtm){
-    showNexElement("pBtmRecFan");
+    showNexElement("pBtmRecFan",pBtmRecFanIsShowing);
   }else{
-    hideNexElement("pBtmRecFan");
+    hideNexElement("pBtmRecFan",pBtmRecFanIsShowing);
   }
   if(gRecircFmt){
-    showNexElement("pFmtRecFan");
+    showNexElement("pFmtRecFan",pFmtRecFanIsShowing);
   }else{
-    hideNexElement("pFmtRecFan");
+    hideNexElement("pFmtRecFan",pFmtRecFanIsShowing);
   }
 
   //final state change --------------------------------
@@ -961,7 +974,7 @@ void timersCheck(){
   // TOP COOL DOWN
   if(topInHeaterCooldownMode()){
     float timeRemain=relayHeaterFanOffTimeTop+RELAY_HTR_FAN_OFF_LIMIT-currentsec;
-    textTop="COOL: "+getCleanSS(timeRemain);
+    textTop=TEXT_COOLING_FAN+getCleanSS(timeRemain);
     showTop=true;
   }
   // TOP HEAT TIMER
@@ -985,9 +998,10 @@ void timersCheck(){
   }
   
   // BTM 
+  
   if(btmInHeaterCooldownMode()){
     float timeRemain=relayHeaterFanOffTimeBtm+RELAY_HTR_FAN_OFF_LIMIT-currentsec;
-    textBtm="COOL: "+getCleanSS(timeRemain);
+    textBtm=TEXT_COOLING_FAN+getCleanSS(timeRemain);
     showBtm=true;
   }
   if(btmHeatEnable && btmTimerEnable){ // standard timer enabled, 1-24 hours
@@ -1005,7 +1019,7 @@ void timersCheck(){
   // FMT 
   if(fmtInHeaterCooldownMode()){
     float timeRemain=relayHeaterFanOffTimeFmt+RELAY_HTR_FAN_OFF_LIMIT-currentsec;
-    textFmt="COOL: "+getCleanSS(timeRemain);
+    textFmt=TEXT_COOLING_FAN+getCleanSS(timeRemain);
     showFmt=true;
   }
   if(fmtHeatEnable && fmtTimerEnable){ // standard timer enabled, 1-24 hours
@@ -1098,22 +1112,7 @@ void systemIncLoop(){
   sendDataNexStatus();
   systemStatus();
 }
-const String STATE_CHANGE="state!ch";
-String serial2EventString="";
-void serialEvent2() {
-  while (Serial2.available()) {
-    //char inChar = (char)Serial2.read();
-    //serial2EventString+=inChar;
-    Serial0.print(Serial2.read());
-    if(serial2EventString==STATE_CHANGE){
-      //nextionStateChange();
-      //Serial0.println("serial2EventString: Serial2");
-      
-    }
-    serial2EventString="";
-  }
-  //Serial0.println(serial2EventString);
-}
+
 // ============= MAIN LOOP ==========================================================================
 void loop() {
   //currentmicros=micros();
@@ -1123,5 +1122,6 @@ void loop() {
   currentTimeHours = float(currentms)/1000/3600;
   systemIncLoop();//run all commands on the system inc loop time
   checkLights();
-  if (Serial2.available())serialEvent2();
+  //if (Serial1.available())serialEvent1();
+  //if (Serial2.available())serialEvent2();
 }
